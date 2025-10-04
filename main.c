@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <time.h>
 
 // Structure for user data
 typedef struct {
@@ -20,13 +22,37 @@ int load_reviews_from_csv(const char *filename);
 int save_reviews_to_csv(const char *filename);
 void add_review();
 void display_all_reviews();
-void delete_review_by_name();
+void enchanced_search_menu();
+void enchanced_delete_menu();
 void free_all_memory();
+
+// Search and display functions
+void search_reviews_partial();
+void display_search_results(int *found_indices, int count, const char *search_term);
+void display_full_review(int index);
+void show_statistics();
+
+// Delete functions
+void delete_review_by_name();
+void delete_by_selection();
+void delete_all_by_user();
+void delete_review_at_index(int index);
+
+// Input validation functions
+int get_safe_int(const char *prompt, int min_val, int max_val);
+char* get_safe_string(const char *prompt, int max_length);
+char* get_safe_date(const char *prompt);
+int is_valid_date(const char *date);
 
 // Helper functions
 char* allocate_string(const char *str);
 void resize_review_array();
-int find_review_by_name(const char *name);
+int find_partial_matches(const char *search_term, int *found_indices, int max_results);
+
+
+
+void trim_whitespace(char *str);
+void display_numbered_results(int *indices, int count);
 
 int main() {
     printf("=== Customer Review Management System ===\n");
@@ -312,6 +338,7 @@ void resize_review_array() {
     }
     printf("Array resized to capacity: %d\n", capacity);
 }
+
 int find_review_by_name(const char *name) {
     for (int i = 0; i < review_count; i++) {
         if (strcmp(reviews[i].reviewer_name, name) == 0) {
@@ -329,4 +356,125 @@ void free_all_memory() {
     }
     free(reviews);
     printf("Memory cleaned up successfully\n");
+}
+
+// === typo matching ===
+
+// function for typo matching
+char* toLowerCase(const char *str) {
+    if (!str) return NULL;
+
+    char* lower = malloc(strlen(str) +1 );
+    if (!tolower) return NULL;
+
+    for (int i = 0; str[i]; i++) {
+        lower[i] = tolower(str[i]);
+    }
+    lower[strlen(str)] = '\0';
+    return lower;
+}
+
+// function for typo matching
+int min3(int a, int b, int c) {
+    int min = a;
+    if (b < min) min = b;
+    if (c < min) min = c;
+    return min;
+}
+
+/**
+ * Calculate Levenshtein Distance (Edit Distance)
+ * Returns number of edits needed to transform str1 to str2
+ * editDistance("kitten", "sitting") = 3
+ *   editDistance("john", "jhon") = 2
+ *   editDistance("sarah", "sara") = 1
+ */
+
+int editDistance(const char* str1, const char* str2) {
+    if (!str1 || !str2) return 999;
+
+    int len1 = strlen(str1);
+    int len2 = strlen(str2);
+
+    int dp[len1 + 1][len2 + 1];
+    for (int i = 0; i <= len1; i++) {
+        dp[i][0] = i;
+    }
+    for (int j = 0; j <= len2; j++) {
+        dp[0][j] = j;
+    }
+
+    for (int i = 1; i <= len1; i++) {
+        for (int j = 1; j <= len2; j++) {
+            if (tolower(str1[i-1]) == tolower(str2[j-1])) {
+                dp[i][j] = dp[i-1][j-1];
+            } else {
+                dp[i][j] = 1 + min3(
+                    dp[i-1][j],
+                    dp[i][j-1],
+                    dp[i-1][j-1]
+                );
+            }
+        }
+    }
+    return dp[len1][len2];
+}
+
+typedef struct {
+    int index;
+    int distance;
+    char matchType[20];
+} SearchResult;
+
+SearchResult* searchWithTypoCorrection(const char* query, int* resultCount, int maxDistance) {
+    if (!query || review\_count == 0) {
+        *resultCount = 0;
+        return NULL;
+    }
+
+    // allocate results array
+    SearchResult* results = malloc(review_count * sizeof(SearchResult));
+    if (!results) {
+        *resultCount = 0;
+        return NULL;
+    }
+
+    *resultCount = 0;
+    char* lowerQuery = toLowerCase(query);
+    
+    // find match
+    for (int i = 0; i < reviewCount; i++) {
+        char* lowerName = toLowerCase(reviews[i].reviewer_name);
+        // calculate edit distance
+        int distance = editDistance(lowerQuery, lowerName);
+
+        if (distance <= maxDistance) {
+            results[*resultCount].index = i;
+            results[*resultCount].distance = distance;
+
+            if (distance == 0) {
+                strcpy(results[*resultCount].matchType, "exact");
+            } else if (distance == 2) {
+                strcpy(results[*resultCount].matchType, "close");
+            } else {
+                strcpy(results[*resultCount].matchType, "fuzzy");
+            }
+            (*resultCount)++;
+        }
+        free(lowerName);
+    }
+    free(lowerQuery);
+
+    // result sorted by distance from (best matches first)
+    for (int i = 0; i < *resultCount - 1; i++) {
+        for (int j = 0; j < *resultCount - i - 1; j++) {
+            if (results[j].distance > results[j+1].distance) {
+                // structType VariableName = array[x] ; in this case "temp" is auto clear, just like int i = 5
+                SearchResult temp = results[j];
+                results[j] = results[j+1];
+                results[j+1] = temp;
+            }
+        }
+    }
+    return results;
 }
