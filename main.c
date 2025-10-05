@@ -77,7 +77,7 @@ int main() {
     int choice;
     do {
         printf("\n╔════════════════════════════════════════╗\n");
-        printf("║    Customer Review Management System  ║\n");
+        printf("║    Customer Review Management System   ║\n");
         printf("╚════════════════════════════════════════╝\n");
         printf("1. Add Review\n");
         printf("2. Display All Reviews\n");
